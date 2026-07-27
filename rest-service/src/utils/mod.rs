@@ -61,7 +61,10 @@ mod tests {
             .unwrap();
 
         let err = config.try_deserialize::<ServerConfig>().unwrap_err();
-        assert!(err.to_string().contains("port"), "expected error about 'port', got: {err}");
+        assert!(
+            err.to_string().contains("port"),
+            "expected error about 'port', got: {err}"
+        );
     }
 
     #[test]
@@ -78,7 +81,10 @@ mod tests {
             .unwrap();
 
         let err = config.try_deserialize::<ServerConfig>().unwrap_err();
-        assert!(err.to_string().contains("_database"), "expected error about '_database', got: {err}");
+        assert!(
+            err.to_string().contains("_database"),
+            "expected error about '_database', got: {err}"
+        );
     }
 
     #[test]
@@ -97,6 +103,9 @@ mod tests {
             .unwrap();
 
         let err = config.try_deserialize::<ServerConfig>().unwrap_err();
-        assert!(err.to_string().contains("address"), "expected error about 'address', got: {err}");
+        assert!(
+            err.to_string().contains("address"),
+            "expected error about 'address', got: {err}"
+        );
     }
 }
