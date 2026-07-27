@@ -13,7 +13,6 @@ env:
 
 jobs:
   docker:
-    if: github.event.repository.fork != true
     runs-on: ubuntu-latest
     permissions:
       contents: read
