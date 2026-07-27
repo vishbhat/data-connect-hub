@@ -1,0 +1,41 @@
+name: Check Signed Commits
+on: pull_request_target
+
+jobs:
+  signed-commits:
+    name: Check commit signatures
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Verify commit signatures
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+          failed=0
+
+          for sha in $(git rev-list "$BASE".."$HEAD"); do
+            # Skip merge commits
+            if [ "$(git rev-list --parents -1 "$sha" | wc -w)" -gt 2 ]; then
+              continue
+            fi
+            if ! git verify-commit "$sha" 2>/dev/null; then
+              echo "WARNING: Commit $sha is not signed."
+              failed=1
+            fi
+          done
+
+          if [ "$failed" -eq 1 ]; then
+            echo ""
+            echo "One or more commits are not signed."
+            echo "See: https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits"
+            exit 1
+          fi
+
+          echo "All commits are signed."
