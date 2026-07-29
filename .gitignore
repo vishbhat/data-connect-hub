@@ -1,3 +1,6 @@
+# macOS
+.DS_Store
+
 # Cargo build output
 target/
 
@@ -31,6 +34,11 @@ coverage.json
 !.hooks/
 .claude/*
 !.claude/CLAUDE.md
+
+# Python SDK build artifacts
+sdk/python/dist/
+sdk/python/src/*.egg-info/
+sdk/python/.coverage
 
 # Docs are markdown only
 docs/**/

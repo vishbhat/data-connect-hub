@@ -20,6 +20,7 @@ endif
 	require-container-engine \
 	container-flight container-rest container-all \
 	container-run-flight container-run-rest \
+	sdk-install sdk-test sdk-lint sdk-fmt sdk-typecheck sdk-build sdk-all \
 	setup-hooks help
 
 # -------------------------------------------------------------------
@@ -108,6 +109,34 @@ check-dco:
 	@bash hack/check-dco.sh
 
 # -------------------------------------------------------------------
+# Python SDK
+# -------------------------------------------------------------------
+
+PYTHON_SDK_DIR := sdk/python
+
+sdk-install:
+	cd $(PYTHON_SDK_DIR) && pip install -e ".[dev]"
+
+sdk-test:
+	cd $(PYTHON_SDK_DIR) && pytest tests/ -v --cov=data_connect_hub
+
+sdk-lint:
+	cd $(PYTHON_SDK_DIR) && ruff check src/ tests/
+	cd $(PYTHON_SDK_DIR) && ruff format --check src/ tests/
+
+sdk-fmt:
+	cd $(PYTHON_SDK_DIR) && ruff format src/ tests/
+	cd $(PYTHON_SDK_DIR) && ruff check --fix src/ tests/
+
+sdk-typecheck:
+	cd $(PYTHON_SDK_DIR) && mypy src/
+
+sdk-build:
+	cd $(PYTHON_SDK_DIR) && python -m build
+
+sdk-all: sdk-lint sdk-typecheck sdk-test
+
+# -------------------------------------------------------------------
 # Dev Setup
 # -------------------------------------------------------------------
 
@@ -150,3 +179,12 @@ help:
 	@echo "  container-all        build all service images"
 	@echo "  container-run-flight run flight-service container (host network)"
 	@echo "  container-run-rest   run rest-service container (host network)"
+	@echo ""
+	@echo "Python SDK:"
+	@echo "  sdk-install          install SDK in editable mode with dev deps"
+	@echo "  sdk-test             run SDK unit tests with coverage"
+	@echo "  sdk-lint             lint and format-check SDK"
+	@echo "  sdk-fmt              format SDK code"
+	@echo "  sdk-typecheck        run mypy on SDK"
+	@echo "  sdk-build            build SDK distribution"
+	@echo "  sdk-all              lint + test SDK"
