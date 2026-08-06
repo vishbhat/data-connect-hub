@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+import json
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -17,6 +18,11 @@ class TestConfigGuards:
         client = DataConnectClient()
         with pytest.raises(DCHConfigError, match="rest_url"):
             client.list_connections()
+
+    def test_flight_without_url_raises(self) -> None:
+        client = DataConnectClient()
+        with pytest.raises(DCHConfigError, match="flight_url"):
+            client.server_info()
 
 
 class TestContextManager:
@@ -97,11 +103,81 @@ class TestEmptyUpdateGuards:
         assert req.location.url == ""
 
 
-class TestIngestDelegation:
-    async def test_ingest(self) -> None:
+class TestReadBytesDelegation:
+    def test_read_bytes(self) -> None:
         client = DataConnectClient(rest_url="http://localhost")
         assert client._rest is not None
-        client._rest.ingest = MagicMock(return_value=b"data")  # type: ignore[method-assign]
+        client._rest.read_bytes = MagicMock(return_value=b"data")  # type: ignore[method-assign]
 
-        result = await client.ingest("conn-1")
+        result = client.read_bytes("conn-1")
         assert result == b"data"
+
+
+class TestReadPandas:
+    def test_returns_dataframe(self) -> None:
+        import pandas as pd
+
+        payload = json.dumps([{"a": 1, "b": 2}]).encode()
+        client = DataConnectClient(rest_url="http://localhost")
+        assert client._rest is not None
+        client._rest.read_bytes = MagicMock(return_value=payload)  # type: ignore[method-assign]
+
+        df = client.read_pandas("conn-1")
+        assert isinstance(df, pd.DataFrame)
+        assert list(df.columns) == ["a", "b"]
+        assert df["a"].tolist() == [1]
+
+    def test_missing_pandas_raises(self) -> None:
+        import builtins
+
+        real_import = builtins.__import__
+
+        def mock_import(name: str, *args: object, **kwargs: object) -> object:
+            if name == "pandas":
+                raise ImportError("No module named 'pandas'")
+            return real_import(name, *args, **kwargs)
+
+        client = DataConnectClient(rest_url="http://localhost")
+        assert client._rest is not None
+        client._rest.read_bytes = MagicMock(return_value=b"data")  # type: ignore[method-assign]
+
+        with (
+            patch("builtins.__import__", side_effect=mock_import),
+            pytest.raises(DCHConfigError, match="pandas is required"),
+        ):
+            client.read_pandas("conn-1")
+
+
+class TestFlightDelegation:
+    def test_query(self) -> None:
+        import pyarrow as pa
+
+        table = pa.table({"col": [1, 2]})
+        client = DataConnectClient(rest_url="http://localhost")
+        client._flight = MagicMock()
+        client._flight.query.return_value = table
+
+        result = client.query("SELECT 1", "conn-1")
+        assert result.equals(table)
+        client._flight.query.assert_called_once_with("SELECT 1", "conn-1")
+
+    def test_query_batches(self) -> None:
+        import pyarrow as pa
+
+        batch = pa.record_batch({"col": [1]})
+        client = DataConnectClient(rest_url="http://localhost")
+        client._flight = MagicMock()
+        client._flight.query_batches.return_value = iter([batch])
+
+        batches = list(client.query_batches("SELECT 1", "conn-1"))
+        assert len(batches) == 1
+        assert batches[0].equals(batch)
+
+    def test_server_info(self) -> None:
+        client = DataConnectClient(rest_url="http://localhost")
+        client._flight = MagicMock()
+        client._flight.server_info.return_value = {"vendor": "DCH"}
+
+        result = client.server_info()
+        assert result == {"vendor": "DCH"}
+        client._flight.server_info.assert_called_once()

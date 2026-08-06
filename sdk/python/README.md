@@ -7,8 +7,14 @@ Python client library for the [Data Connect Hub](https://github.com/opendatahub-
 > **Note:** This package is not yet published to PyPI. Install from source for now.
 
 ```bash
-# From the repository root
+# Full install (REST + Flight SQL)
 pip install -e "sdk/python[dev]"
+
+# REST connection management only
+pip install "sdk/python[connections]"
+
+# Flight SQL data querying only
+pip install "sdk/python[ingestion]"
 ```
 
 ## Quick Start
@@ -18,15 +24,17 @@ from data_connect_hub import DataConnectClient
 
 client = DataConnectClient(
     rest_url="https://dch.example.com",
+    flight_url="grpc://dch.example.com:50051",
     token="<your-token>",  # raw token value, "Bearer" prefix added automatically
     tenant_id="my-tenant",
 )
 
-# List connections
+# List connections (REST)
 connections = client.list_connections()
 
-# Get a specific connection
-conn = client.get_connection("conn-id")
+# Query data via Flight SQL
+table = client.query("SELECT * FROM prompts", connection_id="conn-uuid")
+df = table.to_pandas()
 ```
 
 ## API Reference
@@ -51,10 +59,19 @@ client.update_connection_type(type_id, name=...) -> ConnectionType
 client.delete_connection_type(type_id) -> None
 ```
 
-### Unstructured Data Ingestion (REST)
+### Unstructured Data Access (REST)
 
 ```python
-await client.ingest(connection_id) -> bytes  # async
+client.read_bytes(connection_id) -> bytes
+client.read_pandas(connection_id) -> pd.DataFrame  # requires: pip install data-connect-hub[pandas]
+```
+
+### Tabular Data Queries (Flight SQL)
+
+```python
+client.query(sql, connection_id) -> pyarrow.Table                   # full materialization
+client.query_batches(sql, connection_id) -> Generator[RecordBatch]  # sync, streaming
+client.server_info() -> dict                                   # sync, server metadata
 ```
 
 ## Development
@@ -74,4 +91,4 @@ make sdk-all         # lint + typecheck + test
 ## Requirements
 
 - Python 3.11+
-- Dependencies: httpx, pydantic
+- Dependencies: httpx, pydantic, adbc-driver-flightsql (includes pyarrow)
