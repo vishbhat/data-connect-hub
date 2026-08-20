@@ -5,6 +5,7 @@ use arrow_flight::flight_service_server::FlightServiceServer;
 use clap::Parser;
 use config::{Config, File};
 use elasticsearch_connector::ElasticsearchConnector;
+use uri_connector::UriConnector;
 use flight_service::flight::TabularDataService;
 use flight_service::flight::auth::AuthLayer;
 use flight_service::flight::metrics::{install_prometheus_recorder, spawn_metrics_server};
@@ -90,6 +91,11 @@ fn build_connectors_registry(config: &ServerConfig) -> ConnectorsRegistry {
             config.ingestion_cache_pools.max_capacity,
         )))
         .with_connector(Arc::new(ElasticsearchConnector::new(
+            Duration::from_secs(config.ingestion_cache_pools.ttl_secs),
+            Duration::from_secs(config.ingestion_cache_pools.idle_secs),
+            config.ingestion_cache_pools.max_capacity,
+        )))
+        .with_connector(Arc::new(UriConnector::new(
             Duration::from_secs(config.ingestion_cache_pools.ttl_secs),
             Duration::from_secs(config.ingestion_cache_pools.idle_secs),
             config.ingestion_cache_pools.max_capacity,

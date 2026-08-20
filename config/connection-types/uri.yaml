@@ -1,0 +1,29 @@
+name: URI
+provider: uri
+description: URI-based data source with TOKEN or BASIC authentication
+credentials_fields:
+  - name: URI
+    label: URI
+    description: Base URI for the data source
+    required: true
+    type: string
+  - name: TOKEN
+    label: Token
+    description: Bearer token for TOKEN authentication
+    required: false
+    type: string
+  - name: USERNAME
+    label: Username
+    description: Username for BASIC authentication
+    required: false
+    type: string
+  - name: PASSWORD
+    label: Password
+    description: Password for BASIC authentication
+    required: false
+    type: string
+  - name: CA_CERT
+    label: CA Certificate
+    description: CA certificate for TLS verification (PEM format)
+    required: false
+    type: string
