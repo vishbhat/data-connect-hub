@@ -20,15 +20,14 @@ pip install "sdk/python[flight]"
 from data_connect_hub import AdminSecretRef, DataConnectClient
 
 client = DataConnectClient(
-    rest_url="https://dch.example.com",
-    flight_url="grpc://dch.example.com:50051",
+    url="dch.example.com:8443",
     token="<your-token>",  # or use token_provider= for auto-refresh
     tenant_id="my-tenant",
 )
 
 # Or use a token provider for automatic refresh on 401:
 client = DataConnectClient(
-    rest_url="https://dch.example.com",
+    url="dch.example.com:8443",
     token_provider=lambda: get_fresh_token(),  # your function; called once, cached, refreshed on 401
     tenant_id="my-tenant",
 )
