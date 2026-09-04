@@ -1,6 +1,7 @@
 """Data Connect Hub Python SDK."""
 
-from ._version import __version__
+from importlib.metadata import PackageNotFoundError, version
+
 from .client import DataConnectClient
 from .exceptions import (
     DCHAuthenticationError,
@@ -33,6 +34,11 @@ from .models import (
     UpdateConnectionRequest,
     UpdateConnectionTypeRequest,
 )
+
+try:
+    __version__ = version("data-connect-hub")
+except PackageNotFoundError:
+    __version__ = "unknown"
 
 __all__ = [
     "Capabilities",
