@@ -2765,9 +2765,13 @@ dependencies = [
  "k8s-openapi",
  "kube",
  "moka",
+ "reqwest 0.12.28",
+ "serde",
  "serde_json",
  "thiserror 2.0.21",
+ "tokio",
  "tracing",
+ "url",
 ]
 
 [[package]]
@@ -4373,6 +4377,7 @@ dependencies = [
  "rustls",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror 2.0.21",
  "tokio",
  "tonic",
