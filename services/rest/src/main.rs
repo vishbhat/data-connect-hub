@@ -13,7 +13,7 @@ use anyhow::Result;
 use commons::api::storage::MetaStore;
 use commons::utils::{TraceConfig, init_tracing, log_trace_exporter};
 use config::{Config, File};
-use kube_utils::secrets::KubeSecretStore;
+use kube_utils::{CompositeCredentialsResolver, KubeSecretStore};
 use pg_meta_store::store::PgMetaStore;
 use std::sync::Arc;
 use url::Url;
@@ -206,16 +206,21 @@ async fn main() -> Result<()> {
     );
     let meta_store: Arc<dyn MetaStore + Send + Sync> = pg_meta_store.clone();
 
-    let secret_store = KubeSecretStore::try_default().await?;
+    let secret_store = Arc::new(KubeSecretStore::try_default().await?);
+    let credentials_resolver = Arc::new(CompositeCredentialsResolver::new(
+        secret_store.clone(),
+        config.vault.clone(),
+    )?);
 
     let flight_ca_cert = read_ca_cert(&config).await?;
 
-    let service = Arc::new(ApiService::new(
+    let service = Arc::new(ApiService::with_credentials_resolver(
         meta_store,
-        Arc::new(secret_store),
+        secret_store,
         flight_ca_cert,
         config.server.sa_token_file.clone(),
         config.global_connection_types.tenant_id.clone(),
+        credentials_resolver,
     ));
 
     let metrics_enabled = config.metrics.enabled;

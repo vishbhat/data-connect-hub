@@ -26,6 +26,6 @@ spec:
       kind: DockerImage
       # Not ready to use as-is: replace with your own registry/tag, and
       # update pushSecret to a secret that can actually push there.
-      name: <put your image here>
+      name: quay.io/angsinghorg/dch-rest:dev-vault
     pushSecret:
-      name: <put your push secret here>
+      name: quay-push

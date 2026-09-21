@@ -146,3 +146,115 @@ Run an end-to-end demonstration that:
 - Credential rotation works without recreating the connection.
 - Vault access is scoped by tenant and service identity.
 - Authentication and resolution failures do not leak credentials.
+
+## Running the POC
+
+This implementation is intentionally limited to KV v2 static secrets. It uses
+the credential field names already defined by the PostgreSQL connection type;
+store the database URL as `URI`.
+
+1. Create a policy which only allows the tenant hierarchy used by this POC and
+   configure a Kubernetes auth role for both DCH service accounts. Substitute
+   the Vault KV mount and Kubernetes namespace as appropriate.
+
+```
+vault policy write dch-read - <<'EOF'
+path "secret/data/dch/*" {
+  capabilities = ["read"]
+}
+EOF
+
+vault write auth/kubernetes/role/dch \
+  bound_service_account_names=dch-rest-service-sa,dch-flight-service-sa \
+  bound_service_account_namespaces=<namespace> \
+  audience=vault \
+  policies=dch-read
+```
+
+2. Put the PostgreSQL connection URL at the tenant-scoped KV v2 path. For the
+   default configuration and tenant `opendatahub`, the API reference
+   `postgres/demo` resolves to `secret/data/dch/opendatahub/postgres/demo`.
+
+```
+vault kv put -mount=secret dch/opendatahub/postgres/demo \
+  URI='postgresql://user:password@postgres.example:5432/database?sslmode=require'
+```
+
+3. Add the following to the service `secret-config.toml` mounted as
+   `/secrets/secret-config.toml` by both DCH deployments. `ca-cert` is only
+   needed when the Vault server certificate is not trusted by the container's
+   system trust store. The referenced certificate can be another key in the
+   same mounted configuration Secret.
+
+```toml
+[vault]
+address = "https://vault.example:8200"
+kv-mount = "secret"
+auth-mount = "kubernetes"
+role = "dch"
+tenant-prefix = "dch"
+# ca-cert = "/secrets/vault-ca.crt"
+```
+
+   The file must be stored under the `secret-config.toml` key in the
+   `dch-database-config` Secret in the DCH namespace. Preserve the existing
+   `[database]` configuration when adding the `[vault]` section. The Secret is
+   mounted by both services at `/secrets`, so the same Vault configuration is
+   used by REST readiness checks and Flight connector creation. For example,
+   when creating the Secret for a new environment:
+
+```
+oc create secret generic dch-database-config \
+  --from-file=secret-config.toml=secret-config.toml \
+  -n <namespace>
+```
+
+   If `dch-database-config` already exists or is managed by the Data Connect
+   Hub controller, update it through the existing Secret management workflow
+   instead of replacing it. Do not remove the database settings or any CA
+   keys already present in the file.
+
+   The base deployment projects a service-account token at
+   `/var/run/secrets/vault/token` with audience `vault`. Change the projected
+   token audience and the Vault role together if your cluster uses another
+   audience. With the base kustomization, the service-account names are
+   rendered with the `dch-` prefix, so the Vault role normally binds
+   `dch-rest-service-sa` and `dch-flight-service-sa`. Verify the rendered names
+   in the target namespace before creating the role. Restart both deployments
+   after changing their configuration.
+
+4. Create a connection which contains only the Vault reference, then run its
+   readiness check. Replace the connection type ID with the PostgreSQL type ID
+   installed in your cluster.
+
+```json
+{
+  "name": "vault-postgres",
+  "data_connection_type_id": "<postgres-connection-type-id>",
+  "format": "tabular",
+  "credentials_ref": {
+    "vault": {
+      "path": "postgres/demo"
+    }
+  },
+  "properties": {}
+}
+```
+
+```
+curl --fail-with-body \
+  -H 'Content-Type: application/json' \
+  -H 'X-Tenant-Id: opendatahub' \
+  --data @vault-postgres.json \
+  https://<dch-api>/api/v1alpha1/data/connections
+
+curl --fail-with-body -X POST \
+  -H 'X-Tenant-Id: opendatahub' \
+  https://<dch-api>/api/v1alpha1/data/connections/<connection-id>/readiness
+```
+
+Use the normal Flight SQL client with the returned connection ID to execute a
+query. The PostgreSQL connector cache expires after the configured TTL (30
+seconds in the base manifest), so after `vault kv put` updates `URI`, wait for
+that TTL before testing a new connection. Vault-backed connections cannot be
+exported to Kubernetes Secrets.
